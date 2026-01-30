@@ -1,5 +1,6 @@
 import numpy as np
 import sys
+from load_image import ft_load
 import os
 import matplotlib.pyplot as plt
 from PIL import Image, UnidentifiedImageError
@@ -13,6 +14,10 @@ def is_valide_image(file_path):
     except (UnidentifiedImageError, IOError):
         return False
 
+def augmentation_image(image_data):
+    """Placeholder function for image augmentation."""
+    print("Image augmentation functionality is not yet implemented.")
+
 def main():
     """main function for Augmentation.py"""
     try:
@@ -24,10 +29,10 @@ def main():
         if not is_valide_image(data_image_path):
             raise ValueError(f"The file {data_image_path} is not a valid image.")
         print(f"The file {data_image_path} is a valid image.")
-        data_image = Image.open(data_image_path)
-        print(f"Image format: {data_image.format}")
-        print(f"Image size: {data_image.size}")
-        print(f"Image mode: {data_image.mode}")
+        data_image = ft_load(data_image_path)
+        if data_image is not None:
+            raise NotImplementedError("Image augmentation functionality is not yet implemented.")
+        augmentation_image(data_image)
     except Exception as e:
         print(f"An error occurred: {e}")
         sys.exit(1)
