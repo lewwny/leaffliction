@@ -5,6 +5,8 @@ import os
 
 def analyze_directory(data_directory):
     """Analyze the distribution of files in the given directory."""
+    if not os.path.isdir(data_directory):
+        raise FileNotFoundError(f"The directory {data_directory} does not exist.")
     data = {}
     for subdirectory in os.listdir(data_directory):
         subdirectory_path = os.path.join(data_directory, subdirectory)
@@ -52,8 +54,6 @@ def main():
         if len(sys.argv) != 2:
             raise ValueError("Usage: python Distribution.py <data_directory>")
         data_directory = sys.argv[1]
-        if not os.path.isdir(data_directory):
-            raise FileNotFoundError(f"The directory {data_directory} does not exist.")
         data = analyze_directory(data_directory)
         #Print datas
         if data:
