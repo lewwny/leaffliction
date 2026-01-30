@@ -3,7 +3,11 @@ import sys
 from load_image import ft_load
 import os
 import matplotlib.pyplot as plt
+import argparse
+from Distribution import analyze_directory
 from PIL import Image, UnidentifiedImageError, ImageEnhance, ImageFilter
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def is_valide_image(file_path):
     """Check if the file at file_path is a valid image."""
@@ -41,7 +45,7 @@ def augment_zoom(image_data, zoom_factor=1.2):
 def augment_blur(image_data, blur_radius=2):
     """Apply Gaussian blur to the image."""
     pil_img = Image.fromarray(image_data)
-    blurred_img = pil_img.filter(Image.Filter.GaussianBlur(blur_radius))
+    blurred_img = pil_img.filter(ImageFilter.GaussianBlur(blur_radius))
     return np.array(blurred_img)
 
 def augment_contrast(image_data, factor=1.5):
@@ -58,6 +62,19 @@ def augment_illumination(image_data, factor=1.2):
     illuminated_img = enhancer.enhance(factor)
     return np.array(illuminated_img)
 
+def save_augmented_image(image_data, original_path, augmentation_type):
+    """Save the augmented image to disk."""
+    new_folder = "augmented_directory"
+    if not os.path.exists(new_folder):
+        os.makedirs(new_folder)
+    base_name = os.path.basename(original_path)
+    name, ext = os.path.splitext(base_name)
+    new_file_name = f"{name}_{augmentation_type}{ext}"
+    new_file_path = os.path.join(new_folder, new_file_name)
+    pil_img = Image.fromarray(image_data)
+    pil_img.save(new_file_path)
+    print(f"Saved augmented image: {new_file_path}")
+
 def augmentation_image(image_data, original_path):
     """Placeholder function for image augmentation."""
     augmentations = {
@@ -70,22 +87,52 @@ def augmentation_image(image_data, original_path):
     }
     for aug_name, aug_func in augmentations.items():
         augmented_image = aug_func(image_data)
-        show_image(augmented_image)
-        # save_augmented_image(augmented_image, original_path, aug_name)
+        # show_image(augmented_image)
+        save_augmented_image(augmented_image, original_path, aug_name)
+
+def upgrade_data(data, directory_path):
+    """Augment images in the directory to balance the dataset."""
+    max_count = max(data.values())
+    for subdir, count in data.items():
+        augmentations_needed = max_count - count
+        if augmentations_needed > 0:
+            subdir_path = os.path.join(directory_path, subdir)
+            images = [f for f in os.listdir(subdir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+            i = 0
+            while augmentations_needed > 0:
+                image_file = images[i % len(images)]
+                image_path = os.path.join(subdir_path, image_file)
+                image_data = ft_load(image_path)
+                augmentation_image(image_data, image_path)
+                augmentations_needed -= 1
+                i += 1
 
 def main():
     """main function for Augmentation.py"""
     try:
-        if len(sys.argv) != 2:
-            raise ValueError("Usage: python Augmentation.py <data_directory>")
-        data_image_path = sys.argv[1]
-        if not os.path.isfile(data_image_path):
-            raise FileNotFoundError(f"The file {data_image_path} does not exist.")
-        if not is_valide_image(data_image_path):
-            raise ValueError(f"The file {data_image_path} is not a valid image.")
-        print(f"The file {data_image_path} is a valid image.")
-        data_image = ft_load(data_image_path)
-        augmentation_image(data_image, data_image_path)
+        parser = argparse.ArgumentParser(description="Image Augmentation Script")
+        parser.add_argument("image_path", nargs='?', help="Path to a single image file")
+        parser.add_argument("--augment", type=str, metavar="DIRECTORY", 
+                        help="Path to a directory to balance (augment)")
+        args = parser.parse_args()
+        if args.augment:
+            if not os.path.isdir(args.augment):
+                raise NotADirectoryError(f"The directory {args.augment} does not exist.")
+            directory_path = args.augment
+            data = analyze_directory(directory_path)
+            if not data:
+                raise ValueError("No valid images found in the specified directory.")
+            print(data)
+            upgrade_data(data, directory_path)
+        elif args.image_path:
+            data_image_path = args.image_path
+            if not os.path.isfile(data_image_path):
+                raise FileNotFoundError(f"The file {data_image_path} does not exist.")
+            if not is_valide_image(data_image_path):
+                raise ValueError(f"The file {data_image_path} is not a valid image.")
+            print(f"The file {data_image_path} is a valid image.")
+            data_image = ft_load(data_image_path)
+            augmentation_image(data_image, data_image_path)
     except Exception as e:
         print(f"An error occurred: {e}")
         sys.exit(1)
