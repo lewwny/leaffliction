@@ -92,20 +92,31 @@ def augmentation_image(image_data, original_path):
 
 def upgrade_data(data, directory_path):
     """Augment images in the directory to balance the dataset."""
-    max_count = max(data.values())
-    for subdir, count in data.items():
-        augmentations_needed = max_count - count
-        if augmentations_needed > 0:
-            subdir_path = os.path.join(directory_path, subdir)
-            images = [f for f in os.listdir(subdir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-            i = 0
-            while augmentations_needed > 0:
-                image_file = images[i % len(images)]
-                image_path = os.path.join(subdir_path, image_file)
+    max_images = max(data.values())
+    for class_names, num_images in data.items():
+        class_folder = os.path.join(directory_path, class_names)
+        images_needed = max_images - num_images
+        if images_needed < 6:
+            continue
+        image_files = [f for f in os.listdir(class_folder) if is_valide_image(os.path.join(class_folder, f))]
+        augmentations = [augment_flip, augment_rotate, augment_zoom, 
+                         augment_blur, augment_contrast, augment_illumination]
+        aug_index = 0
+        while images_needed > 0:
+            for image_file in image_files:
+                if images_needed <= 0:
+                    break
+                image_path = os.path.join(class_folder, image_file)
                 image_data = ft_load(image_path)
-                augmentation_image(image_data, image_path)
-                augmentations_needed -= 1
-                i += 1
+                augmented_image = augmentations[aug_index % len(augmentations)](image_data)
+                pil_img = Image.fromarray(augmented_image)
+                new_file_name = f"{os.path.splitext(image_file)[0]}_aug{aug_index}{os.path.splitext(image_file)[1]}"
+                pil_img.save(os.path.join(class_folder, new_file_name))
+                print(f"Saved augmented image: {new_file_name} in {class_folder}")
+                images_needed -= 1
+                aug_index += 1
+        
+
 
 def main():
     """main function for Augmentation.py"""
@@ -122,7 +133,7 @@ def main():
             data = analyze_directory(directory_path)
             if not data:
                 raise ValueError("No valid images found in the specified directory.")
-            print(data)
+            # print(data)
             upgrade_data(data, directory_path)
         elif args.image_path:
             data_image_path = args.image_path
