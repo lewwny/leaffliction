@@ -29,6 +29,31 @@ def organize_dataset(folder: str):
     classes.sort()
 
     print(f"Classes Found: {len(classes)}")
+
     total_imgs = 0
     for i, c in enumerate(classes):
-        
+        img_count = (len(list(source / c).glob("*.[jJ][pP][gG]"))
+                     + len(list(source / c).glob("*.[jJ][pP][eE][gG]"))
+                     + len(list(source / c).glob("*.[pP][nN][gG]")))
+        print(f"{i + 1}.{c}: {img_count} images")
+        total_imgs += img_count
+
+    print(f"Total images: {total_imgs}")
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print("Usage: python Train.py <img_folder>")
+        return 1
+
+    img_folder = sys.argv[1]
+    if not Path(img_folder).exists():
+        print(f"Error: {img_folder} doesn't exist")
+        return 1
+
+    print_method()
+
+
+
+if __name__ == "__main__":
+    main()
