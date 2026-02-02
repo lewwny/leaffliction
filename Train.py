@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
+import torch.optim as optim
 from torchvision import models, transforms, datasets
 from pathlib import Path
 from PIL import Image, ImageEnhance
@@ -120,6 +121,51 @@ def create_model(classes):
     model.classifier[1] = nn.Linear(model.last_channel, classes)
 
     return model.to(DEVICE)
+
+
+def train_model(model, train_loader, valid_loader):
+    """trains model using train and validation loaders"""
+    # get the optimizer for parameters of the classifier
+    optimizer = optim.Adam(model.classifier.parameters(), lr=0.001)
+
+    # uses torch to get crossentropyloss
+    x_entropy_loss = nn.CrossEntropyLoss()
+
+    # scheduler for the LR -> reduces on conversion plateau
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3)
+
+    # metrics to keep during training
+    metrics = {"accuracy": [], "val_acc": [], "loss": [], "val_loss": []}
+
+    # counter vars for training
+    max_model = copy.deepcopy(model.state_dict())
+    max_acc = 0.0
+    count_patience = 0
+    max_patience = 7
+    start_time = time.time()
+
+    # get total passes count
+    total_passes = EPOCHS * (len(train_loader) + len(valid_loader))
+
+    # progress bar using tqdm
+    progress = tqdm(total=total_passes, unit="step", leave=True)
+
+    for e in range (EPOCHS):
+        for phase in ["train", "valid"]:
+            if phase == "train":
+                dataloader = train_loader
+                model.train()
+            else:
+                dataloader = valid_loader
+                model.eval()
+            
+            loss = 0.0
+            
+
+
+
+
+
 
 
 def main() -> int:
