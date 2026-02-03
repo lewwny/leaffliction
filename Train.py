@@ -129,7 +129,7 @@ def train_model(model, train_loader, valid_loader):
     optimizer = optim.Adam(model.classifier.parameters(), lr=0.001)
 
     # uses torch to get crossentropyloss
-    x_entropy_loss = nn.CrossEntropyLoss()
+    xel = nn.CrossEntropyLoss()
 
     # scheduler for the LR -> reduces on conversion plateau
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3)
@@ -150,7 +150,9 @@ def train_model(model, train_loader, valid_loader):
     # progress bar using tqdm
     progress = tqdm(total=total_passes, unit="step", leave=True)
 
+    # iterate over epochs in batches
     for e in range (EPOCHS):
+        # go through both training and validation phases
         for phase in ["train", "valid"]:
             if phase == "train":
                 dataloader = train_loader
@@ -158,14 +160,70 @@ def train_model(model, train_loader, valid_loader):
             else:
                 dataloader = valid_loader
                 model.eval()
-            
+
+            # metrics over epochs
             loss = 0.0
-            
+            corrects = 0
+            samples = 0
+
+            # go through data and send to device
+            for inputs, labels in dataloader:
+                inputs = inputs.to(DEVICE)
+                labels = labels.to(DEVICE)
+
+                # reset grad for the optimizers
+                optim.zero_grad()
+
+                # set training phase grad on torch
+                with torch.set_grad_enabled(phase == "train"):
+                    outs = model(inputs)
+                    _, preds = torch.max(outs, 1)
+                    local_loss = xel(outs, labels)
+
+                    if phase == "train":
+                        local_loss.backward()
+                        optimizer.step()
 
 
 
+def save_model(path: str, model, classes, metrics, folder) -> None:
+    """saves trained model into file"""
+    # save model
+    save_dir = Path(folder).name + "_model"
+    torch.save(model.state_dict(), save_dir / path + ".pth")
+    print(f"model saved to {save_dir}/{path}")
+
+    # make archive
+    shutil.make_archive(path, "zip", save_dir)
+    print(f"archive saved to {save_dir}/{path}.zip")
+
+    # create sha1 signature
+    sig = hashlib.sha1()
+    with open(f"{save_dir}/{path}.zip", "rb") as file:
+        while chunk := file.read(8192):
+            sig.update(chunk)
+
+    # save signature to file
+    with open(f"signature.txt", "w") as file:
+        file.write(f"{sig.hexdigest()}  {save_dir}/{path}.zip\n")
+
+    # load metadata and save to file
+    model_meta = {
+        "classes": classes,
+        "image_size": IMG_SIZE,
+        "class_count": len(classes),
+        "epochs": len(metrics["accuracy"]),
+        "train_accuracy": float(metrics["acc"][-1]),
+        "valid_accuracy": float(metrics["valid_acc"][-1]),
+    }
+
+    with open(path, 'w') as f:
+        json.dump(model_meta, f, indent=2)
+    print(f"Model saved to {path}")
 
 
+def plot_metrics(metrics):
+    """plots history for training"""
 
 
 def main() -> int:
@@ -174,6 +232,8 @@ def main() -> int:
         print("Usage: python Train.py <img_folder>")
         return 1
 
+    # path for where we'll save the final trained model
+    save_path = "lea"
     # check if folder exists
     img_folder = sys.argv[1]
     if not Path(img_folder).exists():
@@ -182,6 +242,23 @@ def main() -> int:
 
     # show device used for training (either gpu or cpu)
     print_device()
+
+    # get sorted data and convert to dataloaders
+    train_dir, valid_dir, classes = sort_data(img_folder)
+    train_loader, valid_loader = data_load(train_dir, valid_dir)
+
+    # create model and train, save metrics
+    model = create_model(len(classes))
+    model, metrics, acc =  train_model(model, train_loader, valid_loader)
+
+    # save model
+    save_model(save_path, model, classes, metrics, img_folder)
+
+    # show results
+    plot_metrics()
+
+    # cleanup
+    shutil.rmtree
 
     return 0
 
