@@ -15,10 +15,32 @@ IMG_SIZE = (224, 224)
 
 def load_model(path: str):
     """loads model from path"""
+    # find files in path
     model_path = Path(path)
+    model_files = list(model_path.glob("*.pth"))
+    metadata_files = list(model_path.glob("*_metadata.json"))
 
-    pth
-    return
+    # verify needed files exist and are found
+    if not model_files or not metadata_files:
+        raise FileNotFoundError(f"files missing for prediction")
+
+    # load metadata
+    with open(metadata_files[0], 'r') as file:
+        metadata = json.load(file)
+
+    classes = metadata["classes"]
+    class_count = metadata["class_count"]
+
+    # create model architecture using mobilenetv2
+    model = models.mobilenet_v2(weights=None)
+    model.classifier[1] = nn.Linear(model.last_channel, class_count)
+
+    # load trained weights to overwrite classifier
+    model.load_state_dict(torch.load(model_files[0], map_location=DEVICE))
+    model = model.to(DEVICE)
+    model.eval()
+
+    return model, classes, metadata
 
 
 def get_transform() -> transforms.Compose:
@@ -46,6 +68,10 @@ def predict_image(model: nn.Module, image_path: str, classes: List[str],
     # get probabilities for each class
 
     # return best probability
+    return
+
+
+def print_pred():
     return
 
 
