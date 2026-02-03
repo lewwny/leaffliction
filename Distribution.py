@@ -20,6 +20,7 @@ def analyze_directory(data_directory):
                 data[subdirectory] = file_count
     return data
 
+
 def plot_histogram(data):
     """Plot a histogram of the file distribution."""
     keys = list(data.keys())
@@ -35,6 +36,7 @@ def plot_histogram(data):
     plt.tight_layout()
     plt.show()
 
+
 def plot_pie_chart(data):
     """Plot a pie chart of the file distribution."""
     plt.figure(figsize=(8, 8))
@@ -43,10 +45,12 @@ def plot_pie_chart(data):
     plt.tight_layout()
     plt.show()
 
+
 def plot_distribution(data):
     """Plot the distribution of files in subdirectories."""
     plot_histogram(data)
     plot_pie_chart(data)
+
 
 def main():
     """main function for Distribution.py"""
@@ -67,6 +71,7 @@ def main():
     except Exception as e:
         print(f"An error occurred: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

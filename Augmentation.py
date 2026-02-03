@@ -9,6 +9,7 @@ from PIL import Image, UnidentifiedImageError, ImageEnhance, ImageFilter
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+
 def is_valide_image(file_path):
     """Check if the file at file_path is a valid image."""
     try:
@@ -18,21 +19,25 @@ def is_valide_image(file_path):
     except (UnidentifiedImageError, IOError):
         return False
 
+
 def show_image(image_data):
     """Display the image represented by image_data."""
     plt.imshow(image_data)
     plt.axis('off')
     plt.show()
 
+
 def augment_flip(image_data):
     """Flip the image horizontally."""
     return np.fliplr(image_data)
+
 
 def augment_rotate(image_data, angle=45):
     """Rotate the image by the given angle."""
     pil_img = Image.fromarray(image_data)
     rotated_img = pil_img.rotate(angle)
     return np.array(rotated_img)
+
 
 def augment_zoom(image_data, zoom_factor=1.2):
     """Zoom into the image by the given zoom factor."""
@@ -42,11 +47,13 @@ def augment_zoom(image_data, zoom_factor=1.2):
     zoomed_img = image_data[start_row:start_row + new_height, start_col:start_col + new_width]
     return np.array(Image.fromarray(zoomed_img).resize((width, height)))
 
+
 def augment_blur(image_data, blur_radius=2):
     """Apply Gaussian blur to the image."""
     pil_img = Image.fromarray(image_data)
     blurred_img = pil_img.filter(ImageFilter.GaussianBlur(blur_radius))
     return np.array(blurred_img)
+
 
 def augment_contrast(image_data, factor=1.5):
     """Adjust the contrast of the image."""
@@ -55,12 +62,14 @@ def augment_contrast(image_data, factor=1.5):
     contrasted_img = enhancer.enhance(factor)
     return np.array(contrasted_img)
 
+
 def augment_illumination(image_data, factor=1.2):
     """Adjust the illumination of the image."""
     pil_img = Image.fromarray(image_data)
     enhancer = ImageEnhance.Brightness(pil_img)
     illuminated_img = enhancer.enhance(factor)
     return np.array(illuminated_img)
+
 
 def save_augmented_image(image_data, original_path, augmentation_type):
     """Save the augmented image to disk."""
@@ -74,6 +83,7 @@ def save_augmented_image(image_data, original_path, augmentation_type):
     pil_img = Image.fromarray(image_data)
     pil_img.save(new_file_path)
     print(f"Saved augmented image: {new_file_path}")
+
 
 def augmentation_image(image_data, original_path):
     """Placeholder function for image augmentation."""
@@ -89,6 +99,7 @@ def augmentation_image(image_data, original_path):
         augmented_image = aug_func(image_data)
         # show_image(augmented_image)
         save_augmented_image(augmented_image, original_path, aug_name)
+
 
 def upgrade_data(data, directory_path):
     """Augment images in the directory to balance the dataset."""
@@ -115,7 +126,6 @@ def upgrade_data(data, directory_path):
                 print(f"Saved augmented image: {new_file_name} in {class_folder}")
                 images_needed -= 1
                 aug_index += 1
-        
 
 
 def main():
