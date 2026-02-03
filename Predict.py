@@ -20,6 +20,35 @@ def load_model(path: str):
     pth
     return
 
+
+def get_transform() -> transforms.Compose:
+    """returns transform pipeline for inference"""
+    # imagenet normalization
+    imagenet_mean = [0.485, 0.456, 0.406]
+    imagenet_std = [0.229, 0.224, 0.225]
+
+    return transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(IMG_SIZE[0]),
+            transforms.ToTensor(),
+            transforms.Normalize(imagenet_mean, imagenet_std)
+        ])
+
+
+def predict_image(model: nn.Module, image_path: str, classes: List[str],
+                  transform: transforms.Compose):
+    # load and transform image
+
+    # run inference
+
+    # predict
+
+    # get probabilities for each class
+
+    # return best probability
+    return
+
+
 def main() -> int:
     """makes predictions using a pre-created leaffliction model"""
     # argv for model dir and image(s)
