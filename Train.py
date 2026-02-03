@@ -1,25 +1,38 @@
-import json, zipfile, sys, shutil, cv2, os, hashlib, random, copy
+import json
+import zipfile
+import sys
+import shutil
+import cv2
+import os
+import hashlib
+import random
+import copy
+import time
+from typing import Dict, List, Tuple, Any
+
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader
 from torchvision import models, transforms, datasets
 from pathlib import Path
 from PIL import Image, ImageEnhance
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 
 # consts
-DEVICE = torch.device("gpu" if torch.cuda.is_available() else "cpu")
-IMG_SIZE = (224, 244)
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+IMG_SIZE = (224, 224)
 B_SIZE = 32
 EPOCHS = 10
 VALID_SPLIT = 0.2
 TARGET_ACC = 0.9
 
 
-def print_device():
+def print_device() -> None:
     """prints device type for processing"""
     if DEVICE.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(0)}")
@@ -27,11 +40,15 @@ def print_device():
         print("Using CPU: Training will be slower")
 
 
-def time_format() -> str:
+def time_format(seconds: float) -> str:
     """formats from time() to readable string"""
-    return
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
-def sort_data(folder: str):
+
+def sort_data(folder: str) -> Tuple[Path, Path, List[str]]:
     """sorts data from folder for train and validation imgs"""
     # get classes from source
     source = Path(folder)
@@ -43,9 +60,10 @@ def sort_data(folder: str):
     # counts images
     total_imgs = 0
     for i, c in enumerate(classes):
-        img_count = (len(list(source / c).glob("*.[jJ][pP][gG]"))
-                     + len(list(source / c).glob("*.[jJ][pP][eE][gG]"))
-                     + len(list(source / c).glob("*.[pP][nN][gG]")))
+        class_path = source / c
+        img_count = (len(list(class_path.glob("*.[jJ][pP][gG]")))
+                     + len(list(class_path.glob("*.[jJ][pP][eE][gG]")))
+                     + len(list(class_path.glob("*.[pP][nN][gG]"))))
         print(f"{i + 1}.{c}: {img_count} images")
         total_imgs += img_count
 
@@ -54,6 +72,7 @@ def sort_data(folder: str):
     # rmtree for the temp
     temp_folder = Path("temp_dataset")
     if temp_folder.exists():
+        # recursive delete
         shutil.rmtree(temp_folder)
 
     # create train and validation directories
@@ -70,12 +89,12 @@ def sort_data(folder: str):
         class_folder = source / c
 
         # get using image type (jpg, jpeg, png) capitalization insensitive
-        imgs = ((list(source / c).glob("*.[jJ][pP][gG]"))
-                     + (list(source / c).glob("*.[jJ][pP][eE][gG]"))
-                     + (list(source / c).glob("*.[pP][nN][gG]")))
+        imgs = (list(class_folder.glob("*.[jJ][pP][gG]"))
+                     + list(class_folder.glob("*.[jJ][pP][eE][gG]"))
+                     + list(class_folder.glob("*.[pP][nN][gG]")))
 
         # use sklearn train test split on images
-        train_imgs, valid_imgs = train_test_split(imgs, test_size=VALID_SPLIT, random_state=40)
+        train_imgs, valid_imgs = train_test_split(imgs, test_size=VALID_SPLIT, random_state=42)
 
         # shutil copy all images in train and validation
         for img in train_imgs:
@@ -83,37 +102,49 @@ def sort_data(folder: str):
         for img in valid_imgs:
             shutil.copy(img, valid_dir / c / img.name)
 
-        print(f"{c}: {len(train_imgs)}\ntrain, {len(valid_imgs)} validation")
+        print(f"{c}: {len(train_imgs)} train, {len(valid_imgs)} validation")
 
     return train_dir, valid_dir, classes
 
 
-def data_load(train_dir, valid_dir):
+def data_load(train_dir: Path, valid_dir: Path) -> Tuple[DataLoader, DataLoader]:
     """augmentation + normalization for training data"""
+    # imagenet normalization values (mean/std used by pretrained models)
+    imagenet_mean = [0.485, 0.456, 0.406]
+    imagenet_std = [0.229, 0.224, 0.225]
+
     # transforming data for augmentation and norm
     transforms_data = {
-        "train": transforms.Compose([transforms.RandomResizedCrop(IMG_SIZE[0]),
-                                     transforms.RandomHorizontalFlip(),
-                                    """...."""]),
+        "train": transforms.Compose([
+            transforms.RandomResizedCrop(IMG_SIZE[0]),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(15),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2),
+            transforms.ToTensor(),
+            transforms.Normalize(imagenet_mean, imagenet_std)
+        ]),
 
-        "valid": transforms.Compose([transforms.Resize(256),
-                                     transforms.CenterCrop(IMG_SIZE[0]),
-                                    """...."""]),
+        "valid": transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(IMG_SIZE[0]),
+            transforms.ToTensor(),
+            transforms.Normalize(imagenet_mean, imagenet_std)
+        ]),
     }
 
     # builds datasets from imagefolder
     train_dataset = datasets.ImageFolder(train_dir, transforms_data["train"])
-    valid_dataset = datasets.ImageFolder(train_dir, transforms_data["valid"])
+    valid_dataset = datasets.ImageFolder(valid_dir, transforms_data["valid"])
 
     # create dataloader from datasets
     train_loader = DataLoader(train_dataset, batch_size=B_SIZE, shuffle=True, num_workers=4)
-    valid_loader = DataLoader(valid_dataset, batch_size=B_SIZE, shuffle=True, num_workers=4)
+    valid_loader = DataLoader(valid_dataset, batch_size=B_SIZE, shuffle=False, num_workers=4)
 
     return train_loader, valid_loader
 
 
-def create_model(classes):
-    """Creates a model using MobileNetV2"""
+def create_model(num_classes: int) -> nn.Module:
+    """creates a model using MobileNetV2"""
     # gets the mobilenetv2 model with default weights
     model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
 
@@ -122,12 +153,13 @@ def create_model(classes):
         p.requires_grad = False
 
     # replace classifier
-    model.classifier[1] = nn.Linear(model.last_channel, classes)
+    model.classifier[1] = nn.Linear(model.last_channel, num_classes)
 
     return model.to(DEVICE)
 
 
-def train_model(model, train_loader, valid_loader):
+def train_model(model: nn.Module, train_loader: DataLoader, valid_loader: DataLoader
+) -> Tuple[Dict[str, Any], Dict[str, List[float]], float, float]:
     """trains model using train and validation loaders"""
     # get the optimizer for parameters of the classifier
     optimizer = optim.Adam(model.classifier.parameters(), lr=0.001)
@@ -135,24 +167,30 @@ def train_model(model, train_loader, valid_loader):
     # uses torch to get crossentropyloss
     xel = nn.CrossEntropyLoss()
 
-    # scheduler for the LR -> reduces on conversion plateau
+    # scheduler for the LR -> reduces on plateau
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3)
 
     # metrics to keep during training
-    metrics = {"accuracy": [], "val_acc": [], "loss": [], "val_loss": []}
+    metrics = {
+        "train_acc": [],
+        "val_acc": [],
+        "train_loss": [],
+        "val_loss": [],
+        "learning_rate": []
+    }
 
     # counter vars for training
-    max_model = copy.deepcopy(model.state_dict())
+    best_model = copy.deepcopy(model.state_dict())
     max_acc = 0.0
     count_patience = 0
     max_patience = 7
     start_time = time.time()
 
     # get total passes count
-    total_passes = EPOCHS * (len(train_loader) + len(valid_loader))
+    total_steps = EPOCHS * (len(train_loader) + len(valid_loader))
 
     # progress bar using tqdm
-    progress = tqdm(total=total_passes, unit="step", leave=True)
+    progress = tqdm(total=total_steps, unit="batch", leave=True)
 
     # iterate over epochs in batches
     for e in range (EPOCHS):
@@ -175,23 +213,23 @@ def train_model(model, train_loader, valid_loader):
                 inputs = inputs.to(DEVICE)
                 labels = labels.to(DEVICE)
 
-                # reset grad for the optimizers ?
-                optim.zero_grad()
+                # reset grad for the optimizers (avoids accumulation from previous batch)
+                optimizer.zero_grad()
 
-                # set training phase grad on torch ?
+                # set training phase grad on torch (disabled during validation for speed)
                 with torch.set_grad_enabled(phase == "train"):
                     outs = model(inputs)
                     _, preds = torch.max(outs, 1)
                     local_loss = xel(outs, labels)
 
-                    # if phase is training ?
+                    # if phase is training (backpdrop and update weights)
                     if phase == "train":
                         local_loss.backward()
                         optimizer.step()
 
                 # update metrics
                 samples += inputs.size(0)
-                corrections += torch.sum(preds == labels.data)
+                corrections += torch.sum(preds == labels.data).item()
                 loss += local_loss.item() * inputs.size(0)
 
                 # update progress bar
@@ -199,21 +237,16 @@ def train_model(model, train_loader, valid_loader):
 
             # get epoch loss and acc
             e_loss = loss / samples
-            e_acc = corrections.double() / samples
+            e_acc = corrections / samples
 
             # store metrics
             if phase == "train":
-                metrics["accuracy"].append(e_acc.item())
-                metrics["loss"].append(e_loss)
+                metrics["train_acc"].append(e_acc)
+                metrics["train_loss"].append(e_loss)
+                metrics["learning_rate"].append(optimizer.param_groups[0]["lr"])
             else:
-                total_acc = metrics["accuracy"][-1]
-                total_loss = metrics["loss"][-1]
-                v_acc = e_acc.item()
-                v_loss = e_loss
-                metrics["accuracy"].append(v_acc)
-                metrics["loss"].append(v_loss)
-
-                # update metrics here
+                metrics["val_acc"].append(e_acc)
+                metrics["val_loss"].append(e_loss)
 
                 # move scheduler using epoch acc
                 scheduler.step(e_acc)
@@ -221,8 +254,9 @@ def train_model(model, train_loader, valid_loader):
                 # deep copy model if better acc
                 if e_acc > max_acc:
                     max_acc = e_acc
-                    max_model = copy.deepcopy(model.state_dict())
+                    best_model = copy.deepcopy(model.state_dict())
                     count_patience = 0
+                    progress.write(f"Epoch {epoch+1}: New best accuracy: {e_acc:.4f}")
                 else:
                     # add to patience counter to stop training uselessly
                     count_patience += 1
@@ -235,49 +269,60 @@ def train_model(model, train_loader, valid_loader):
     # close progress bar
     progress.close()
 
+    # print total training time
     total_time = time.time() - start_time
     print(f"Total training time: {time_format(total_time)}")
+    print(f"Best validation accuracy: {max_acc:.4f}")
+
+    # return best model and metrics
+    return best_model, metrics, max_acc, total_time
 
 
-def save_model(path: str, model, classes, metrics, folder) -> None:
+def save_model(path: str, model_state: Dict[str, Any], classes: List[str],
+               metrics: Dict[str, List[float]], folder: str) -> None:
     """saves trained model into file"""
     # save model
-    save_dir = Path(folder).name + "_model"
-    torch.save(model.state_dict(), save_dir / path + ".pth")
-    print(f"model saved to {save_dir}/{path}")
+    save_dir = Path(Path(folder).name + "_model")
+    save_dir.mkdir(exist_ok=True)
+
+    model_path = save_dir / f"{path}.pth"
+    torch.save(model_state, model_path)
+    print(f"model saved to {model_path}")
 
     # make archive
-    shutil.make_archive(path, "zip", save_dir)
-    print(f"archive saved to {save_dir}/{path}.zip")
+    archive_path = shutil.make_archive(path, "zip", save_dir)
+    print(f"archive saved to {archive_path}")
 
     # create sha1 signature
     sig = hashlib.sha1()
-    with open(f"{save_dir}/{path}.zip", "rb") as file:
+    with open(archive_path, "rb") as file:
         while chunk := file.read(8192):
             sig.update(chunk)
 
     # save signature to file
-    with open(f"signature.txt", "w") as file:
-        file.write(f"{sig.hexdigest()}  {save_dir}/{path}.zip\n")
+    with open("signature.txt", "w") as file:
+        file.write(f"{sig.hexdigest()}  {archive_path}\n")
 
     # load metadata and save to file
     model_meta = {
         "classes": classes,
         "image_size": IMG_SIZE,
         "class_count": len(classes),
-        "epochs": len(metrics["accuracy"]),
-        "train_accuracy": float(metrics["acc"][-1]),
-        "valid_accuracy": float(metrics["valid_acc"][-1]),
+        "epochs": len(metrics["train_acc"]),
+        "train_accuracy": float(metrics["train_acc"][-1]),
+        "valid_accuracy": float(metrics["val_acc"][-1]),
+        "train_loss": float(metrics["train_loss"][-1]),
+        "valid_loss": float(metrics["val_loss"][-1]),
     }
 
-    with open(path, 'w') as f:
+    meta_path = save_dir / f"{path}_metadata.json"
+    with open(meta_path, 'w') as f:
         json.dump(model_meta, f, indent=2)
-    print(f"Model saved to {path}")
+    print(f"Metadata saved to {meta_path}")
 
 
-def plot_metrics(metrics):
+def plot_metrics(metrics: Dict[str, List[float]], save_path: str = "training_metrics.png") -> None:
     """plots history for training"""
-
 
 def main() -> int:
     # argv for image folder
@@ -286,7 +331,8 @@ def main() -> int:
         return 1
 
     # path for where we'll save the final trained model
-    save_path = "lea"
+    save_path = "leaffliction_model"
+
     # check if folder exists
     img_folder = sys.argv[1]
     if not Path(img_folder).exists():
@@ -302,18 +348,21 @@ def main() -> int:
 
     # create model and train, save metrics
     model = create_model(len(classes))
-    model, metrics, acc =  train_model(model, train_loader, valid_loader)
+    best_model, metrics, best_acc, train_time = train_model(model, train_loader, valid_loader)
 
     # save model
-    save_model(save_path, model, classes, metrics, img_folder)
+    save_model(save_path, best_model, classes, metrics, img_folder)
 
     # show results
-    plot_metrics()
+    plot_metrics(metrics)
 
     # cleanup
-    shutil.rmtree
+    temp_folder = Path("temp_dataset")
+    if temp_folder.exists():
+        shutil.rmtree(temp_folder)
 
     return 0
 
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
