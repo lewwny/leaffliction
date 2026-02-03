@@ -323,6 +323,58 @@ def save_model(path: str, model_state: Dict[str, Any], classes: List[str],
 
 def plot_metrics(metrics: Dict[str, List[float]], save_path: str = "training_metrics.png") -> None:
     """plots history for training"""
+    epochs = list(range(1, len(metrics["train_acc"]) + 1))
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.suptitle("Training Metrics", fontsize=16, fontweight="bold")
+
+    # accuracy over epochs (train vs validation)
+    ax1 = axes[0, 0]
+    ax1.plot(epochs, metrics["train_acc"], 'b-o', label="Train Accuracy", linewidth=2, markersize=4)
+    ax1.plot(epochs, metrics["val_acc"], 'r-o', label="Validation Accuracy", linewidth=2, markersize=4)
+    ax1.set_xlabel("Epoch")
+    ax1.set_ylabel("Accuracy")
+    ax1.set_title("Model Accuracy")
+    ax1.legend(loc="lower right")
+    ax1.grid(True, alpha=0.3)
+    ax1.set_ylim([0, 1])
+
+    # loss over epochs (train vs validation)
+    ax2 = axes[0, 1]
+    ax2.plot(epochs, metrics["train_loss"], 'b-o', label="Train Loss", linewidth=2, markersize=4)
+    ax2.plot(epochs, metrics["val_loss"], 'r-o', label="Validation Loss", linewidth=2, markersize=4)
+    ax2.set_xlabel("Epoch")
+    ax2.set_ylabel("Loss")
+    ax2.set_title("Model Loss (CrossEntropy)")
+    ax2.legend(loc="upper right")
+    ax2.grid(True, alpha=0.3)
+
+    # learning rate schedule
+    ax3 = axes[1, 0]
+    ax3.plot(epochs, metrics["learning_rate"], 'g-o', label="Learning Rate", linewidth=2, markersize=4)
+    ax3.set_xlabel("Epoch")
+    ax3.set_ylabel("Learning Rate")
+    ax3.set_title("Learning Rate Schedule")
+    ax3.legend(loc="upper right")
+    ax3.grid(True, alpha=0.3)
+    ax3.set_yscale("log")
+
+    # overfitting detection (gap between train and val)
+    ax4 = axes[1, 1]
+    acc_gap = [t - v for t, v in zip(metrics["train_acc"], metrics["val_acc"])]
+    loss_gap = [v - t for t, v in zip(metrics["train_loss"], metrics["val_loss"])]
+    ax4.bar([e - 0.2 for e in epochs], acc_gap, 0.4, label="Acc Gap (Train-Val)", color="blue", alpha=0.7)
+    ax4.bar([e + 0.2 for e in epochs], loss_gap, 0.4, label="Loss Gap (Val-Train)", color="red", alpha=0.7)
+    ax4.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+    ax4.set_xlabel("Epoch")
+    ax4.set_ylabel("Gap")
+    ax4.set_title("Overfitting Detection (positive = overfitting)")
+    ax4.legend(loc="upper right")
+    ax4.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
 
 def main() -> int:
     # argv for image folder
