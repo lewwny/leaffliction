@@ -27,6 +27,10 @@ def print_device():
         print("Using CPU: Training will be slower")
 
 
+def time_format() -> str:
+    """formats from time() to readable string"""
+    return
+
 def sort_data(folder: str):
     """sorts data from folder for train and validation imgs"""
     # get classes from source
@@ -162,28 +166,77 @@ def train_model(model, train_loader, valid_loader):
                 model.eval()
 
             # metrics over epochs
-            loss = 0.0
-            corrects = 0
             samples = 0
+            corrections = 0
+            loss = 0.0
 
             # go through data and send to device
             for inputs, labels in dataloader:
                 inputs = inputs.to(DEVICE)
                 labels = labels.to(DEVICE)
 
-                # reset grad for the optimizers
+                # reset grad for the optimizers ?
                 optim.zero_grad()
 
-                # set training phase grad on torch
+                # set training phase grad on torch ?
                 with torch.set_grad_enabled(phase == "train"):
                     outs = model(inputs)
                     _, preds = torch.max(outs, 1)
                     local_loss = xel(outs, labels)
 
+                    # if phase is training ?
                     if phase == "train":
                         local_loss.backward()
                         optimizer.step()
 
+                # update metrics
+                samples += inputs.size(0)
+                corrections += torch.sum(preds == labels.data)
+                loss += local_loss.item() * inputs.size(0)
+
+                # update progress bar
+                progress.update(1)
+
+            # get epoch loss and acc
+            e_loss = loss / samples
+            e_acc = corrections.double() / samples
+
+            # store metrics
+            if phase == "train":
+                metrics["accuracy"].append(e_acc.item())
+                metrics["loss"].append(e_loss)
+            else:
+                total_acc = metrics["accuracy"][-1]
+                total_loss = metrics["loss"][-1]
+                v_acc = e_acc.item()
+                v_loss = e_loss
+                metrics["accuracy"].append(v_acc)
+                metrics["loss"].append(v_loss)
+
+                # update metrics here
+
+                # move scheduler using epoch acc
+                scheduler.step(e_acc)
+
+                # deep copy model if better acc
+                if e_acc > max_acc:
+                    max_acc = e_acc
+                    max_model = copy.deepcopy(model.state_dict())
+                    count_patience = 0
+                else:
+                    # add to patience counter to stop training uselessly
+                    count_patience += 1
+
+        # early stop checker (patience limit reached)
+        if count_patience >= max_patience:
+            progress.write("Max patience reached - Stopping")
+            break
+
+    # close progress bar
+    progress.close()
+
+    total_time = time.time() - start_time
+    print(f"Total training time: {time_format(total_time)}")
 
 
 def save_model(path: str, model, classes, metrics, folder) -> None:
