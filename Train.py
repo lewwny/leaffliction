@@ -377,6 +377,7 @@ def plot_metrics(metrics: Dict[str, List[float]], save_path: str = "training_met
 
 
 def main() -> int:
+    """uses an image folder to train a model for leaf recognition ML"""
     # argv for image folder
     if len(sys.argv) < 2:
         print("Usage: python Train.py <img_folder>")
