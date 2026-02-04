@@ -1,16 +1,11 @@
 import json
-import zipfile
 import sys
 import shutil
-import cv2
-import os
 import hashlib
-import random
 import copy
 import time
 from typing import Dict, List, Tuple, Any
 
-import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
@@ -18,7 +13,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import models, transforms, datasets
 from pathlib import Path
-from PIL import Image, ImageEnhance
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
@@ -256,7 +250,7 @@ def train_model(model: nn.Module, train_loader: DataLoader, valid_loader: DataLo
                     max_acc = e_acc
                     best_model = copy.deepcopy(model.state_dict())
                     count_patience = 0
-                    progress.write(f"Epoch {epoch+1}: New best accuracy: {e_acc:.4f}")
+                    progress.write(f"Epoch {e+1}: New best accuracy: {e_acc:.4f}")
                 else:
                     # add to patience counter to stop training uselessly
                     count_patience += 1

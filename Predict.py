@@ -114,6 +114,7 @@ def main() -> int:
         return 1
 
     # get transform
+    transform = get_transform()
 
     # predict each image in each image path
     for image_path in image_paths:
@@ -123,8 +124,9 @@ def main() -> int:
 
         try:
             # predict here
-            a = 1
-        except FileNotFoundError as e:
+            p_class, confidence, probas = predict_image(model, image_path, classes, transform)
+            print_pred(image_path, p_class, confidence, probas)
+        except Exception as e:
             print(f"Error processing {image_path}: {e}")
 
     return 0
