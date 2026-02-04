@@ -59,19 +59,35 @@ def get_transform() -> transforms.Compose:
 
 def predict_image(model: nn.Module, image_path: str, classes: List[str],
                   transform: transforms.Compose):
+    """makes a class prediction for an image"""
     # load and transform image
+    image = Image.open(image_path).convert("RGB")
+    image_tensor = transform(image).unsqueeze(0).to(DEVICE)
 
     # run inference
+    with torch.no_grad():
+        outputs = model(image_tensor)
+        probas = torch.nn.functional.softmax(outputs, dim=1)
+        confidence, predindex = torch.max(probas, 1)
 
     # predict
+    p_class = classes[predindex.item()]
+    p_confidence = confidence.item()
 
     # get probabilities for each class
+    probabilities = {classes[i]: probas[0][i].item() for i in range (len(classes))}
 
-    # return best probability
-    return
+    # return all metrics
+    return p_class, p_confidence, probabilities
 
 
-def print_pred():
+def print_pred(image_path: str, p_class: str, confidence: float,
+               probas: Dict[str, float]) -> None:
+    """prints the results of predictions"""
+    print(f"Image: {image_path}\nPredicted class: {p_class}")
+    print(f"Confidence: {confidence:.2%}\nAll probabilities:")
+    for c, proba in sorted (probas.items()):
+        print(f"{c:30s} {proba:.2%}")
     return
 
 
