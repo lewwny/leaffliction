@@ -3,10 +3,12 @@ import numpy as np
 import sys
 import os
 
+
 def analyze_directory(data_directory):
     """Analyze the distribution of files in the given directory."""
     if not os.path.isdir(data_directory):
-        raise FileNotFoundError(f"The directory {data_directory} does not exist.")
+        raise FileNotFoundError(f"The directory "
+                                f"{data_directory} does not exist.")
     data = {}
     for subdirectory in os.listdir(data_directory):
         subdirectory_path = os.path.join(data_directory, subdirectory)
@@ -14,7 +16,8 @@ def analyze_directory(data_directory):
             file_count = 0
             for item in os.listdir(subdirectory_path):
                 item_path = os.path.join(subdirectory_path, item)
-                if os.path.isfile(item_path) and item.lower().endswith(('.jpg', '.jpeg', '.png')):
+                if os.path.isfile(item_path) and item.lower().endswith(
+                        ('.jpg', '.jpeg', '.png')):
                     file_count += 1
             if file_count > 0:
                 data[subdirectory] = file_count
@@ -24,7 +27,6 @@ def analyze_directory(data_directory):
 def plot_histogram(data):
     """Plot a histogram of the file distribution."""
     keys = list(data.keys())
-    values = list(data.values())
     n_bars = len(keys)
     colors = plt.cm.viridis(np.linspace(0, 1, n_bars))
     plt.figure(figsize=(10, 6))
@@ -40,7 +42,8 @@ def plot_histogram(data):
 def plot_pie_chart(data):
     """Plot a pie chart of the file distribution."""
     plt.figure(figsize=(8, 8))
-    plt.pie(data.values(), labels=data.keys(), autopct='%1.1f%%', startangle=140)
+    plt.pie(data.values(), labels=data.keys(),
+            autopct='%1.1f%%', startangle=140)
     plt.title('Image Distribution in Subdirectories')
     plt.tight_layout()
     plt.show()
@@ -59,7 +62,6 @@ def main():
             raise ValueError("Usage: python Distribution.py <data_directory>")
         data_directory = sys.argv[1]
         data = analyze_directory(data_directory)
-        #Print datas
         if data:
             print("File distribution in subdirectories:")
             for subdir, count in data.items():
