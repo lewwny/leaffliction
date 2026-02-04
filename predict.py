@@ -1,3 +1,4 @@
+from copy import Error
 import json
 import sys
 import torch
@@ -9,6 +10,7 @@ from typing import List, Tuple, Dict, Any
 import numpy as np
 import cv2
 import rembg
+import matplotlib.pyplot as plt
 from plantcv import plantcv as pcv
 
 
@@ -119,25 +121,27 @@ def print_pred(image_path: str, p_class: str, confidence: float,
     return
 
 def draw_pred(image_path: str, p_class: str, confidence: float, metadata: Dict[str, Any]) -> None:
-    """draws prediction on image"""
+    """displays prediction on image"""
     # load image
     image = cv2.imread(image_path)
-
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     
-    # draw text on image
-    text = f"Predicted: {p_class} ({confidence:.2%})"
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.8
-    color = (0, 255, 0)
-    thickness = 2
-    position = (10, 30)
-    cv2.putText(image, text, position, font, font_scale, color, thickness, cv2.LINE_AA)
+    # create figure and display image
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.imshow(image)
+    ax.axis('off')
     
-    # show image in a window
-    window_name = "Prediction"
-    cv2.imshow(window_name, image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # set title with image path
+    ax.set_title(Path(image_path).name, fontsize=14, fontweight='bold')
+    
+    # add subtitle with prediction details
+    subtitle = f"Predicted: {p_class}\nConfidence: {confidence:.2%}"
+    fig.text(0.5, 0.02, subtitle, ha='center', va='bottom', fontsize=12, 
+             bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.8))
+    
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.12)
+    plt.show()
 
 
 def main() -> int:
