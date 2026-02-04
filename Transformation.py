@@ -160,13 +160,18 @@ def process_single_image(image_path, dst_folder=None):
     pseudolandmarks = create_pseudolandmarks_image(image, kept_mask)
     pseudowithoutbg = create_pseudolandmarks_image(masked, kept_mask)
 
+    # Doublewithoutbg: concatenation horizontale de Mask + Pseudowithoutbg (utilisé pour le training)
+    doublewithoutbg = np.concatenate((masked, pseudowithoutbg), axis=1)
+
     images = {
         "Original": image,
         "Gaussian_blur": cv2.cvtColor(gaussian_blur, cv2.COLOR_GRAY2RGB),
         "Mask": masked,
         "ROI_Objects": roi_image,
         "Analyze_object": analysis_image,
-        "Pseudolandmarks": pseudolandmarks
+        "Pseudolandmarks": pseudolandmarks,
+        "Pseudowithoutbg": pseudowithoutbg,
+        "Doublewithoutbg": doublewithoutbg
     }
 
     base_name = os.path.splitext(os.path.basename(image_path))[0]
@@ -203,12 +208,52 @@ def process_single_image(image_path, dst_folder=None):
         plt.close()
         plot_histogram(image, kept_mask)
 
+def process_doublewithoutbg(image_path, dst_folder):
+    """Process image and save only Doublewithoutbg (for training)."""
+    image_bgr = ft_load(image_path)
+    if image_bgr is None:
+        return
+        
+    image = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+    
+    # Remove background
+    image_without_bg = rembg.remove(image)
+
+    # Pre-processing
+    l_grayscale = pcv.rgb2gray_lab(rgb_img=image_without_bg, channel='l')
+    l_thresh = pcv.threshold.binary(gray_img=l_grayscale, threshold=35, object_type='light')
+    filled = pcv.fill(bin_img=l_thresh, size=200)
+    gaussian_blur = pcv.gaussian_blur(img=filled, ksize=(3, 3))
+    masked = pcv.apply_mask(img=image, mask=gaussian_blur, mask_color='black')
+
+    # ROI for pseudolandmarks
+    roi = pcv.roi.rectangle(img=masked, x=0, y=0, w=image.shape[0], h=image.shape[1])
+    kept_mask = pcv.roi.filter(mask=filled, roi=roi, roi_type='partial')
+
+    # Pseudolandmarks on masked image
+    pseudowithoutbg = create_pseudolandmarks_image(masked, kept_mask)
+
+    # Doublewithoutbg: concatenation horizontale de Mask + Pseudowithoutbg
+    doublewithoutbg = np.concatenate((masked, pseudowithoutbg), axis=1)
+
+    # Save
+    if not os.path.exists(dst_folder):
+        os.makedirs(dst_folder)
+    
+    base_name = os.path.splitext(os.path.basename(image_path))[0]
+    save_img = cv2.cvtColor(doublewithoutbg, cv2.COLOR_RGB2BGR)
+    save_path = os.path.join(dst_folder, f"{base_name}_Doublewithoutbg.jpg")
+    cv2.imwrite(save_path, save_img)
+    print(f"Saved: {save_path}")
+
+
 def main():
     try:
         parser = argparse.ArgumentParser(description="PlantCV Pipeline Transformation")
         parser.add_argument("image_path", type=str, nargs='?', help="Path to the input image file.")
         parser.add_argument("-src", type=str, help="Source directory for images.")
         parser.add_argument("-dst", type=str, help="Destination directory for output.")
+        parser.add_argument("--double", action="store_true", help="Save only Doublewithoutbg images (for training).")
         args = parser.parse_args()
         
         # Batch Mode
@@ -226,7 +271,10 @@ def main():
                 if filename.endswith(valid_exts):
                     file_path = os.path.join(args.src, filename)
                     try:
-                        process_single_image(file_path, dst_folder=args.dst)
+                        if args.double:
+                            process_doublewithoutbg(file_path, dst_folder=args.dst)
+                        else:
+                            process_single_image(file_path, dst_folder=args.dst)
                     except Exception as e:
                         print(f"Error processing {filename}: {e}")
 
