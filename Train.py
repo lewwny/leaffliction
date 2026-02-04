@@ -17,8 +17,49 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 
+# toggle to force cpu usage
+FORCE_CPU = False
+
+
+def get_device() -> torch.device:
+    """gets the best available device for training"""
+    if FORCE_CPU:
+        return torch.device("cpu")
+
+    if not torch.cuda.is_available():
+        return torch.device("cpu")
+
+    # check cuda and pytorch compatibility
+    try:
+        # test if cuda works
+        test_tensor = torch.zeros(1).cuda()
+        del test_tensor
+        return torch.device("cuda")
+    except Exception as e:
+        print(f"CUDA error: {e}")
+        print("falling back to cpu...")
+        return torch.device("cpu")
+
+
+def check_gpu_info() -> None:
+    """prints gpu and cuda info for debugging (to get correct version for pytorch)"""
+    print(f"pytorch version: {torch.__version__}")
+    print(f"cuda available: {torch.cuda.is_available()}")
+    if torch.cuda.is_available():
+        print(f"cuda version: {torch.version.cuda}")
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"GPU compute capability: {torch.cuda.get_device_capability(0)}")
+        major, minor = torch.cuda.get_device_capability(0)
+        if major < 6:
+            print("WARNING: GPU compute capability < 6.0, may have issues")
+        print(f"cuDNN version: {torch.backends.cudnn.version()}")
+    else:
+        print("No CUDA GPU detected")
+        print("To enable GPU, use a compatible pytorch version with CUDA support to your current device")
+
+
 # consts
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = get_device()
 IMG_SIZE = (224, 224)
 B_SIZE = 32
 EPOCHS = 10
@@ -28,6 +69,8 @@ TARGET_ACC = 0.9
 
 def print_device() -> None:
     """prints device type for processing"""
+    check_gpu_info()
+    print(f"Using: {DEVICE}")
     if DEVICE.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(0)}")
     else:

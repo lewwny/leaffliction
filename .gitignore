@@ -3,3 +3,4 @@ __pycache__/
 augmented_directory/
 .DS_Store
 images/
+venv/
