@@ -236,6 +236,9 @@ def process_doublewithoutbg(image_path, dst_folder):
     # Doublewithoutbg: concatenation horizontale de Mask + Pseudowithoutbg
     doublewithoutbg = np.concatenate((masked, pseudowithoutbg), axis=1)
 
+    # Resize to 256x256 for training compatibility
+    doublewithoutbg = cv2.resize(doublewithoutbg, (256, 256), interpolation=cv2.INTER_AREA)
+
     # Save
     if not os.path.exists(dst_folder):
         os.makedirs(dst_folder)
@@ -247,6 +250,35 @@ def process_doublewithoutbg(image_path, dst_folder):
     print(f"Saved: {save_path}")
 
 
+def process_mask(image_path, dst_folder):
+    """Process image and save only Mask (leaf on black background) for training."""
+    image_bgr = ft_load(image_path)
+    if image_bgr is None:
+        return
+        
+    image = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+    
+    # Remove background
+    image_without_bg = rembg.remove(image)
+
+    # Pre-processing
+    l_grayscale = pcv.rgb2gray_lab(rgb_img=image_without_bg, channel='l')
+    l_thresh = pcv.threshold.binary(gray_img=l_grayscale, threshold=35, object_type='light')
+    filled = pcv.fill(bin_img=l_thresh, size=200)
+    gaussian_blur = pcv.gaussian_blur(img=filled, ksize=(3, 3))
+    masked = pcv.apply_mask(img=image, mask=gaussian_blur, mask_color='black')
+
+    # Save
+    if not os.path.exists(dst_folder):
+        os.makedirs(dst_folder)
+    
+    base_name = os.path.splitext(os.path.basename(image_path))[0]
+    save_img = cv2.cvtColor(masked, cv2.COLOR_RGB2BGR)
+    save_path = os.path.join(dst_folder, f"{base_name}_Mask.jpg")
+    cv2.imwrite(save_path, save_img)
+    print(f"Saved: {save_path}")
+
+
 def main():
     try:
         parser = argparse.ArgumentParser(description="PlantCV Pipeline Transformation")
@@ -254,6 +286,7 @@ def main():
         parser.add_argument("-src", type=str, help="Source directory for images.")
         parser.add_argument("-dst", type=str, help="Destination directory for output.")
         parser.add_argument("--double", action="store_true", help="Save only Doublewithoutbg images (for training).")
+        parser.add_argument("--mask", action="store_true", help="Save only Mask images (leaf on black background, recommended for training).")
         args = parser.parse_args()
         
         # Batch Mode
@@ -273,6 +306,8 @@ def main():
                     try:
                         if args.double:
                             process_doublewithoutbg(file_path, dst_folder=args.dst)
+                        elif args.mask:
+                            process_mask(file_path, dst_folder=args.dst)
                         else:
                             process_single_image(file_path, dst_folder=args.dst)
                     except Exception as e:

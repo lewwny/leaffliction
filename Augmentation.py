@@ -129,7 +129,6 @@ def upgrade_data(data, directory_path):
                       f"in {class_folder}")
                 images_needed -= 1
                 aug_index += 1
-        
 
 
 def main():
