@@ -1,5 +1,5 @@
 #!/bin/bash
-MODEL="images_model"
+MODEL="images_model_v1"
 IMAGES="images"
 TYPES=(Apple_Black_rot Apple_healthy Apple_rust Apple_scab Grape_Black_rot Grape_Esca Grape_healthy Grape_spot)
 
