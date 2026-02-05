@@ -3,4 +3,6 @@ __pycache__/
 augmented_directory/
 .DS_Store
 images/
+images_transformed/
+images_model*/
 venv/
