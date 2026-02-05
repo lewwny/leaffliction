@@ -25,14 +25,10 @@ def collect_samples(classes: list) -> tuple:
     return images, labels
 
 
-def run_benchmark(model_path: str, use_mask: bool = False):
+def run_benchmark(model, model_name: str, classes, images, true_labels, use_mask: bool = False):
     """run benchmark on model and plot results"""
-    # load model
-    model, classes, metadata = load_model(model_path)
+    # get transforms
     transform = get_transform()
-
-    # collect samples
-    images, true_labels = collect_samples(classes)
 
     # run predictions
     print(f"Running predictions on {len(images)} images (mask={use_mask})")
@@ -56,7 +52,6 @@ def run_benchmark(model_path: str, use_mask: bool = False):
     f1 = f1_score(true_labels, predictions, average='weighted')
 
     # plot results
-    model_name = Path(model_path).name
     mode = "masked" if use_mask else "normal"
     title = f"{model_name} ({mode})"
 
@@ -93,20 +88,28 @@ def run_benchmark(model_path: str, use_mask: bool = False):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python benchmark.py <model_dir> [--mask]")
-        print("  --mask: use mask transformation (for models trained on masked images)")
+    if len(sys.argv) < 3:
+        print("Usage: python benchmark.py <model1_dir> <model2_dir")
         return 1
 
-    use_mask = "--mask" in sys.argv
-    model_path = [arg for arg in sys.argv[1:] if arg != "--mask"][0]
+    model_path1 = sys.argv[1]
 
-    if not Path(model_path).exists():
-        print(f"Error: {model_path} not found")
+    if not Path(model_path1).exists():
+        print(f"Error: {model_path1} not found")
+        return 1
+    
+    model_path2 = sys.argv[2]
+
+    if not Path(model_path2).exists():
+        print(f"Error: {model_path2} not found")
         return 1
 
     random.seed(42)
-    run_benchmark(model_path, use_mask)
+    model1, classes1, _ = load_model(model_path1)
+    model2, _, _ = load_model(model_path1)
+    images, true_labels = collect_samples(classes1)
+    run_benchmark(model1, "model_v1", classes1, images, true_labels, False)
+    run_benchmark(model2, "model_v2", classes1, images, true_labels, True)
     return 0
 
 
