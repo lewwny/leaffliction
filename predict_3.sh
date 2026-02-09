@@ -5,8 +5,9 @@ TYPES=(Apple_Black_rot Apple_healthy Apple_rust Apple_scab Grape_Black_rot Grape
 
 for i in "${!TYPES[@]}"; do
   type="${TYPES[$i]}"
-  n=$([ "$i" -lt 4 ] && echo 13 || echo 12)
+  n=$([ "$i" -lt 4 ] && echo 3)
   while IFS= read -r image; do
     [ -n "$image" ] && python predict.py "$MODEL" "$image"
   done < <(find "$IMAGES/$type" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) 2>/dev/null | shuf -n "$n")
 done
+q

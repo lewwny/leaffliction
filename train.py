@@ -42,7 +42,8 @@ def get_device() -> torch.device:
 
 
 def check_gpu_info() -> None:
-    """prints gpu and cuda info for debugging (to get correct version for pytorch)"""
+    """prints gpu and cuda info for debugging
+    (to get correct version for pytorch)"""
     print(f"pytorch version: {torch.__version__}")
     print(f"cuda available: {torch.cuda.is_available()}")
     if torch.cuda.is_available():
@@ -55,7 +56,8 @@ def check_gpu_info() -> None:
         print(f"cuDNN version: {torch.backends.cudnn.version()}")
     else:
         print("No CUDA GPU detected")
-        print("To enable GPU, use a compatible pytorch version with CUDA support to your current device")
+        print("To enable GPU, use a compatible pytorch "
+              "version with CUDA support to your current device")
 
 
 # consts
@@ -127,11 +129,13 @@ def sort_data(folder: str) -> Tuple[Path, Path, List[str]]:
 
         # get using image type (jpg, jpeg, png) capitalization insensitive
         imgs = (list(class_folder.glob("*.[jJ][pP][gG]"))
-                     + list(class_folder.glob("*.[jJ][pP][eE][gG]"))
-                     + list(class_folder.glob("*.[pP][nN][gG]")))
+                + list(class_folder.glob("*.[jJ][pP][eE][gG]"))
+                + list(class_folder.glob("*.[pP][nN][gG]")))
 
         # use sklearn train test split on images
-        train_imgs, valid_imgs = train_test_split(imgs, test_size=VALID_SPLIT, random_state=42)
+        train_imgs, valid_imgs = train_test_split(imgs,
+                                                  test_size=VALID_SPLIT,
+                                                  random_state=42)
 
         # shutil copy all images in train and validation
         for img in train_imgs:
@@ -144,7 +148,8 @@ def sort_data(folder: str) -> Tuple[Path, Path, List[str]]:
     return train_dir, valid_dir, classes
 
 
-def data_load(train_dir: Path, valid_dir: Path) -> Tuple[DataLoader, DataLoader]:
+def data_load(train_dir: Path,
+              valid_dir: Path) -> Tuple[DataLoader, DataLoader]:
     """augmentation + normalization for training data"""
     # imagenet normalization values (mean/std used by pretrained models)
     imagenet_mean = [0.485, 0.456, 0.406]
@@ -174,8 +179,10 @@ def data_load(train_dir: Path, valid_dir: Path) -> Tuple[DataLoader, DataLoader]
     valid_dataset = datasets.ImageFolder(valid_dir, transforms_data["valid"])
 
     # create dataloader from datasets
-    train_loader = DataLoader(train_dataset, batch_size=B_SIZE, shuffle=True, num_workers=4)
-    valid_loader = DataLoader(valid_dataset, batch_size=B_SIZE, shuffle=False, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=B_SIZE,
+                              shuffle=True, num_workers=4)
+    valid_loader = DataLoader(valid_dataset, batch_size=B_SIZE,
+                              shuffle=False, num_workers=4)
 
     return train_loader, valid_loader
 
@@ -195,8 +202,10 @@ def create_model(num_classes: int) -> nn.Module:
     return model.to(DEVICE)
 
 
-def train_model(model: nn.Module, train_loader: DataLoader, valid_loader: DataLoader
-) -> Tuple[Dict[str, Any], Dict[str, List[float]], float, float]:
+def train_model(model: nn.Module, train_loader: DataLoader,
+                valid_loader: DataLoader) -> Tuple[Dict[str, Any],
+                                                   Dict[str, List[float]],
+                                                   float, float]:
     """trains model using train and validation loaders"""
     # get the optimizer for parameters of the classifier
     optimizer = optim.Adam(model.classifier.parameters(), lr=0.001)
@@ -205,7 +214,8 @@ def train_model(model: nn.Module, train_loader: DataLoader, valid_loader: DataLo
     xel = nn.CrossEntropyLoss()
 
     # scheduler for the LR -> reduces on plateau
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max",
+                                                     factor=0.5, patience=3)
 
     # metrics to keep during training
     metrics = {
@@ -213,7 +223,7 @@ def train_model(model: nn.Module, train_loader: DataLoader, valid_loader: DataLo
         "val_acc": [],
         "train_loss": [],
         "val_loss": [],
-        "learning_rate": []
+        "l_rate": []
     }
 
     # counter vars for training
@@ -230,7 +240,7 @@ def train_model(model: nn.Module, train_loader: DataLoader, valid_loader: DataLo
     progress = tqdm(total=total_steps, unit="batch", leave=True)
 
     # iterate over epochs in batches
-    for e in range (EPOCHS):
+    for e in range(EPOCHS):
         # go through both training and validation phases
         for phase in ["train", "valid"]:
             if phase == "train":
@@ -250,10 +260,12 @@ def train_model(model: nn.Module, train_loader: DataLoader, valid_loader: DataLo
                 inputs = inputs.to(DEVICE)
                 labels = labels.to(DEVICE)
 
-                # reset grad for the optimizers (avoids accumulation from previous batch)
+                # reset grad for the optimizers
+                # (avoids accumulation from previous batch)
                 optimizer.zero_grad()
 
-                # set training phase grad on torch (disabled during validation for speed)
+                # set training phase grad on torch
+                # (disabled during validation for speed)
                 with torch.set_grad_enabled(phase == "train"):
                     outs = model(inputs)
                     _, preds = torch.max(outs, 1)
@@ -280,7 +292,7 @@ def train_model(model: nn.Module, train_loader: DataLoader, valid_loader: DataLo
             if phase == "train":
                 metrics["train_acc"].append(e_acc)
                 metrics["train_loss"].append(e_loss)
-                metrics["learning_rate"].append(optimizer.param_groups[0]["lr"])
+                metrics["l_rate"].append(optimizer.param_groups[0]["lr"])
             else:
                 metrics["val_acc"].append(e_acc)
                 metrics["val_loss"].append(e_loss)
@@ -293,7 +305,7 @@ def train_model(model: nn.Module, train_loader: DataLoader, valid_loader: DataLo
                     max_acc = e_acc
                     best_model = copy.deepcopy(model.state_dict())
                     count_patience = 0
-                    progress.write(f"Epoch {e+1}: New best accuracy: {e_acc:.4f}")
+                    progress.write(f"Epoch {e+1}: New best acc: {e_acc:.4f}")
                 else:
                     # add to patience counter to stop training uselessly
                     count_patience += 1
@@ -358,7 +370,8 @@ def save_model(path: str, model_state: Dict[str, Any], classes: List[str],
     print(f"Metadata saved to {meta_path}")
 
 
-def plot_metrics(metrics: Dict[str, List[float]], save_path: str = "training_metrics.png") -> None:
+def plot_metrics(metrics: Dict[str, List[float]],
+                 save_path: str = "training_metrics.png") -> None:
     """plots history for training"""
     epochs = list(range(1, len(metrics["train_acc"]) + 1))
 
@@ -367,8 +380,10 @@ def plot_metrics(metrics: Dict[str, List[float]], save_path: str = "training_met
 
     # accuracy over epochs (train vs validation)
     ax1 = axes[0, 0]
-    ax1.plot(epochs, metrics["train_acc"], 'b-o', label="Train Accuracy", linewidth=2, markersize=4)
-    ax1.plot(epochs, metrics["val_acc"], 'r-o', label="Validation Accuracy", linewidth=2, markersize=4)
+    ax1.plot(epochs, metrics["train_acc"], 'b-o',
+             label="Train Accuracy", linewidth=2, markersize=4)
+    ax1.plot(epochs, metrics["val_acc"], 'r-o',
+             label="Validation Accuracy", linewidth=2, markersize=4)
     ax1.set_xlabel("Epoch")
     ax1.set_ylabel("Accuracy")
     ax1.set_title("Model Accuracy")
@@ -378,8 +393,10 @@ def plot_metrics(metrics: Dict[str, List[float]], save_path: str = "training_met
 
     # loss over epochs (train vs validation)
     ax2 = axes[0, 1]
-    ax2.plot(epochs, metrics["train_loss"], 'b-o', label="Train Loss", linewidth=2, markersize=4)
-    ax2.plot(epochs, metrics["val_loss"], 'r-o', label="Validation Loss", linewidth=2, markersize=4)
+    ax2.plot(epochs, metrics["train_loss"], 'b-o',
+             label="Train Loss", linewidth=2, markersize=4)
+    ax2.plot(epochs, metrics["val_loss"], 'r-o',
+             label="Validation Loss", linewidth=2, markersize=4)
     ax2.set_xlabel("Epoch")
     ax2.set_ylabel("Loss")
     ax2.set_title("Model Loss (CrossEntropy)")
@@ -388,7 +405,8 @@ def plot_metrics(metrics: Dict[str, List[float]], save_path: str = "training_met
 
     # learning rate schedule
     ax3 = axes[1, 0]
-    ax3.plot(epochs, metrics["learning_rate"], 'g-o', label="Learning Rate", linewidth=2, markersize=4)
+    ax3.plot(epochs, metrics["l_rate"], 'g-o',
+             label="Learning Rate", linewidth=2, markersize=4)
     ax3.set_xlabel("Epoch")
     ax3.set_ylabel("Learning Rate")
     ax3.set_title("Learning Rate Schedule")
@@ -398,10 +416,14 @@ def plot_metrics(metrics: Dict[str, List[float]], save_path: str = "training_met
 
     # overfitting detection (gap between train and val)
     ax4 = axes[1, 1]
-    acc_gap = [t - v for t, v in zip(metrics["train_acc"], metrics["val_acc"])]
-    loss_gap = [v - t for t, v in zip(metrics["train_loss"], metrics["val_loss"])]
-    ax4.bar([e - 0.2 for e in epochs], acc_gap, 0.4, label="Acc Gap (Train-Val)", color="blue", alpha=0.7)
-    ax4.bar([e + 0.2 for e in epochs], loss_gap, 0.4, label="Loss Gap (Val-Train)", color="red", alpha=0.7)
+    acc_gap = [t - v for t, v in zip(metrics["train_acc"],
+                                     metrics["val_acc"])]
+    loss_gap = [v - t for t, v in zip(metrics["train_loss"],
+                                      metrics["val_loss"])]
+    ax4.bar([e - 0.2 for e in epochs], acc_gap, 0.4,
+            label="Acc Gap (Train-Val)", color="blue", alpha=0.7)
+    ax4.bar([e + 0.2 for e in epochs], loss_gap, 0.4,
+            label="Loss Gap (Val-Train)", color="red", alpha=0.7)
     ax4.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
     ax4.set_xlabel("Epoch")
     ax4.set_ylabel("Gap")
@@ -438,7 +460,9 @@ def main() -> int:
 
     # create model and train, save metrics
     model = create_model(len(classes))
-    best_model, metrics, best_acc, train_time = train_model(model, train_loader, valid_loader)
+    best_model, metrics, best_acc, train_time = train_model(model,
+                                                            train_loader,
+                                                            valid_loader)
 
     # save model
     save_model(save_path, best_model, classes, metrics, img_folder)

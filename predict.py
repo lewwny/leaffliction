@@ -1,4 +1,3 @@
-from copy import Error
 import json
 import sys
 import torch
@@ -6,8 +5,7 @@ import torch.nn as nn
 from torchvision import models, transforms
 from pathlib import Path
 from PIL import Image
-from typing import List, Tuple, Dict, Any
-import numpy as np
+from typing import List, Dict, Any
 import cv2
 import rembg
 import matplotlib.pyplot as plt
@@ -28,7 +26,7 @@ def load_model(path: str):
 
     # verify needed files exist and are found
     if not model_files or not metadata_files:
-        raise FileNotFoundError(f"files missing for prediction")
+        raise FileNotFoundError("files missing for prediction")
 
     # load metadata
     with open(metadata_files[0], 'r') as file:
@@ -68,17 +66,18 @@ def apply_mask_transform(image_path: str) -> Image.Image:
     # load image
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    
+
     # remove background
     image_without_bg = rembg.remove(image)
-    
+
     # pre-processing with plantCV
     l_grayscale = pcv.rgb2gray_lab(rgb_img=image_without_bg, channel='l')
-    l_thresh = pcv.threshold.binary(gray_img=l_grayscale, threshold=35, object_type='light')
+    l_thresh = pcv.threshold.binary(gray_img=l_grayscale,
+                                    threshold=35, object_type='light')
     filled = pcv.fill(bin_img=l_thresh, size=200)
     gaussian_blur = pcv.gaussian_blur(img=filled, ksize=(3, 3))
     masked = pcv.apply_mask(img=image, mask=gaussian_blur, mask_color='black')
-    
+
     # convert to PIL Image
     return Image.fromarray(masked)
 
@@ -91,7 +90,7 @@ def predict_image(model: nn.Module, image_path: str, classes: List[str],
         image = apply_mask_transform(image_path)
     else:
         image = Image.open(image_path).convert("RGB")
-    
+
     image_tensor = transform(image).unsqueeze(0).to(DEVICE)
 
     # run inference
@@ -105,7 +104,8 @@ def predict_image(model: nn.Module, image_path: str, classes: List[str],
     p_confidence = confidence.item()
 
     # get probabilities for each class
-    probabilities = {classes[i]: probas[0][i].item() for i in range (len(classes))}
+    probabilities = {classes[i]: probas[0][i].item()
+                     for i in range(len(classes))}
 
     # return all metrics
     return p_class, p_confidence, probabilities
@@ -116,29 +116,31 @@ def print_pred(image_path: str, p_class: str, confidence: float,
     """prints the results of predictions"""
     print(f"Image: {image_path}\nPredicted class: {p_class}")
     print(f"Confidence: {confidence:.2%}\nAll probabilities:")
-    for c, proba in sorted (probas.items()):
+    for c, proba in sorted(probas.items()):
         print(f"{c:30s} {proba:.2%}")
     return
 
-def draw_pred(image_path: str, p_class: str, confidence: float, metadata: Dict[str, Any]) -> None:
+
+def draw_pred(image_path: str, p_class: str,
+              confidence: float, metadata: Dict[str, Any]) -> None:
     """displays prediction on image"""
     # load image
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    
+
     # create figure and display image
     fig, ax = plt.subplots(figsize=(10, 8))
     ax.imshow(image)
     ax.axis('off')
-    
+
     # set title with image path
     ax.set_title(Path(image_path).name, fontsize=14, fontweight='bold')
-    
+
     # add subtitle with prediction details
     subtitle = f"Predicted: {p_class}\nConfidence: {confidence:.2%}"
-    fig.text(0.5, 0.02, subtitle, ha='center', va='bottom', fontsize=12, 
+    fig.text(0.5, 0.02, subtitle, ha='center', va='bottom', fontsize=12,
              bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.8))
-    
+
     plt.tight_layout()
     plt.subplots_adjust(bottom=0.12)
     plt.show()
@@ -148,14 +150,16 @@ def main() -> int:
     """makes predictions using a pre-created leaffliction model"""
     # argv for model dir and image(s)
     if len(sys.argv) < 3:
-        print("Usage: python Predict.py <model_dir> <image_path> [image_path2 ...] [--mask]")
-        print("  --mask: apply mask transformation (use if model was trained on masked images)")
+        print("Usage: python Predict.py <model_dir> <image_path>"
+              "[image_path2 ...] [--mask]")
+        print("  --mask: apply mask transformation"
+              "(use if model was trained on masked images)")
         return 1
 
     # Check for --mask flag
     use_mask = "--mask" in sys.argv
     args = [arg for arg in sys.argv[1:] if arg != "--mask"]
-    
+
     model_dir = args[0]
     image_paths = args[1:]
 
@@ -182,7 +186,11 @@ def main() -> int:
 
         try:
             # predict here
-            p_class, confidence, probas = predict_image(model, image_path, classes, transform, use_mask)
+            p_class, confidence, probas = predict_image(model,
+                                                        image_path,
+                                                        classes,
+                                                        transform,
+                                                        use_mask)
             print_pred(image_path, p_class, confidence, probas)
             draw_pred(image_path, p_class, confidence, metadata)
         except Exception as e:

@@ -9,6 +9,7 @@ from PIL import Image, UnidentifiedImageError, ImageEnhance, ImageFilter
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+
 def is_valide_image(file_path):
     """Check if the file at file_path is a valid image."""
     try:
@@ -18,21 +19,25 @@ def is_valide_image(file_path):
     except (UnidentifiedImageError, IOError):
         return False
 
+
 def show_image(image_data):
     """Display the image represented by image_data."""
     plt.imshow(image_data)
     plt.axis('off')
     plt.show()
 
+
 def augment_flip(image_data):
     """Flip the image horizontally."""
     return np.fliplr(image_data)
+
 
 def augment_rotate(image_data, angle=45):
     """Rotate the image by the given angle."""
     pil_img = Image.fromarray(image_data)
     rotated_img = pil_img.rotate(angle)
     return np.array(rotated_img)
+
 
 def augment_zoom(image_data, zoom_factor=1.2):
     """Zoom into the image by the given zoom factor."""
@@ -100,7 +105,6 @@ def augmentation_image(image_data, original_path):
 def upgrade_data(data, directory_path):
     """Augment images in the directory to balance the dataset."""
     max_images = max(data.values())
-    use_flag = False
     for class_names, num_images in data.items():
         class_folder = os.path.join(directory_path, class_names)
         images_needed = max_images - num_images

@@ -9,3 +9,4 @@ tqdm>=4.65.0
 pandas>=2.3.3
 rembg>=2.0.69
 plantcv>=4.10.2
+onnxruntime>=1.23.2
