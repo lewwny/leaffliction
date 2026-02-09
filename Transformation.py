@@ -9,33 +9,27 @@ from plantcv import plantcv as pcv
 from load_image import ft_load
 from Augmentation import is_valide_image
 
-def is_in_circle(x, y, center_x, center_y, radius):
-    if (x - center_x) ** 2 + (y - center_y) ** 2 <= radius ** 2:
-        return True
-    return False
 
 def plot_stat_hist(label, sc=1):
-    # Using 'default' because label="default" is passed to analyze.color
-    try:
-        observations = pcv.outputs.observations['default']
-        # Depending on PlantCV version, structure might differ slightly
-        if 'color_analysis' in observations:
-            data = observations['color_analysis'][label]
-        else:
-            data = observations[label]
-            
-        y = data['histogram']
-        x = [i * sc for i in range(len(y))]
-        
-        if label == "hue_frequencies":
-            x = x[:int(255 / 2)]
-            y = y[:int(255 / 2)]
-        if label == "blue-yellow_frequencies" or label == "green-magenta_frequencies":
-            x = [val + 128 for val in x]
-            
-        plt.plot(x, y, label=label)
-    except KeyError:
-        pass # Skip missing labels safely
+
+    """
+    Retrieve the histogram x and y values and plot them
+    """
+
+    y = pcv.outputs.observations['default_1'][label]['value']
+    x = [
+        i * sc
+        for i in pcv.outputs.observations['default_1'][label]['label']
+    ]
+    if label == "hue_frequencies":
+        x = x[:int(255 / 2)]
+        y = y[:int(255 / 2)]
+    if (
+        label == "blue-yellow_frequencies" or
+        label == "green-magenta_frequencies"
+    ):
+        x = [x + 128 for x in x]
+    plt.plot(x, y, label=label)
 
 def is_roi_border(x, y, roi_start_x, roi_start_y, roi_h, roi_w, roi_line_w):
     return (
@@ -58,46 +52,52 @@ def create_roi_image(image, masked, filled):
     roi_image = image.copy()
     roi_image[kept_mask != 0] = (0, 255, 0)
     
-    # Simple border drawing (could be optimized with cv2.rectangle)
     cv2.rectangle(roi_image, (roi_start_y, roi_start_x), (roi_start_y + roi_h, roi_start_x + roi_w), (255, 0, 0), roi_line_w)
 
     return roi_image, kept_mask
 
 def plot_histogram(image, kept_mask, save_path=None):
+
+    """
+    Plot the histogram of the image
+    """
+
     dict_label = {
-        "blue": 1,
-        "green": 1,
-        "green-magenta": 1,
-        "lightness": 2.55,
-        "red": 1,
-        "blue-yellow": 1,
-        "hue": 1,
-        "saturation": 2.55,
-        "value": 2.55
+        "blue_frequencies": 1,
+        "green_frequencies": 1,
+        "green-magenta_frequencies": 1,
+        "lightness_frequencies": 2.55,
+        "red_frequencies": 1,
+        "blue-yellow_frequencies": 1,
+        "hue_frequencies": 1,
+        "saturation_frequencies": 2.55,
+        "value_frequencies": 2.55
     }
 
-    # Ensure mask is labeled
-    if np.max(kept_mask) > 0:
-        labels_mask, _ = pcv.create_labels(mask=kept_mask)
-    else:
-        labels_mask = kept_mask
+    labels, _ = pcv.create_labels(mask=kept_mask)
+    pcv.analyze.color(
+        rgb_img=image,
+        colorspaces="all",
+        labeled_mask=labels,
+        label="default"
+    )
 
-    pcv.outputs.clear()
-    pcv.analyze.color(rgb_img=image, colorspaces="all", labeled_mask=labels_mask, label="default")
-
-    plt.figure(figsize=(16, 9))
+    plt.subplots(figsize=(16, 9))
     for key, val in dict_label.items():
         plot_stat_hist(key, val)
 
     plt.legend()
+
     plt.title("Color Histogram")
     plt.xlabel("Pixel intensity")
-    plt.ylabel("Proportion of pixels")
-    plt.grid(visible=True, which='major', axis='both', linestyle='--')
-    
-    if save_path:
-        plt.savefig(save_path)
-    else:
+    plt.ylabel("Proportion of pixels (%)")
+    plt.grid(
+        visible=True,
+        which='major',
+        axis='both',
+        linestyle='--',
+    )
+    if not save_path:
         plt.show()
     plt.close()
 
@@ -107,7 +107,6 @@ def draw_pseudolandmarks(image, pseudolandmarks, color, radius):
         
     for i in range(len(pseudolandmarks)):
         point = None
-        # Handle different output formats from PlantCV versions
         if isinstance(pseudolandmarks[i], np.ndarray):
             point = pseudolandmarks[i].flatten()
         elif isinstance(pseudolandmarks[i], (list, tuple)):
@@ -129,7 +128,7 @@ def create_pseudolandmarks_image(image, kept_mask):
         pseudolandmarks = draw_pseudolandmarks(pseudolandmarks, bottom_x, (255, 0, 255), 5)
         pseudolandmarks = draw_pseudolandmarks(pseudolandmarks, center_v_x, (255, 0, 0), 5)
     except Exception:
-        pass # Handle cases where landmarks cannot be found
+        pass 
     return pseudolandmarks
 
 def process_single_image(image_path, dst_folder=None):
@@ -155,13 +154,10 @@ def process_single_image(image_path, dst_folder=None):
     
     analysis_image = pcv.analyze.size(img=image, labeled_mask=kept_mask)
     if not isinstance(analysis_image, np.ndarray):
-         analysis_image = image # Fallback if analyze.size returns non-image object
+         analysis_image = image 
 
     pseudolandmarks = create_pseudolandmarks_image(image, kept_mask)
     pseudowithoutbg = create_pseudolandmarks_image(masked, kept_mask)
-
-    # Doublewithoutbg: concatenation horizontale de Mask + Pseudowithoutbg (utilisé pour le training)
-    doublewithoutbg = np.concatenate((masked, pseudowithoutbg), axis=1)
 
     images = {
         "Original": image,
@@ -170,8 +166,7 @@ def process_single_image(image_path, dst_folder=None):
         "ROI_Objects": roi_image,
         "Analyze_object": analysis_image,
         "Pseudolandmarks": pseudolandmarks,
-        "Pseudowithoutbg": pseudowithoutbg,
-        "Doublewithoutbg": doublewithoutbg
+        "Pseudowithoutbg": pseudowithoutbg
     }
 
     base_name = os.path.splitext(os.path.basename(image_path))[0]
@@ -208,48 +203,6 @@ def process_single_image(image_path, dst_folder=None):
         plt.close()
         plot_histogram(image, kept_mask)
 
-def process_doublewithoutbg(image_path, dst_folder):
-    """Process image and save only Doublewithoutbg (for training)."""
-    image_bgr = ft_load(image_path)
-    if image_bgr is None:
-        return
-        
-    image = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-    
-    # Remove background
-    image_without_bg = rembg.remove(image)
-
-    # Pre-processing
-    l_grayscale = pcv.rgb2gray_lab(rgb_img=image_without_bg, channel='l')
-    l_thresh = pcv.threshold.binary(gray_img=l_grayscale, threshold=35, object_type='light')
-    filled = pcv.fill(bin_img=l_thresh, size=200)
-    gaussian_blur = pcv.gaussian_blur(img=filled, ksize=(3, 3))
-    masked = pcv.apply_mask(img=image, mask=gaussian_blur, mask_color='black')
-
-    # ROI for pseudolandmarks
-    roi = pcv.roi.rectangle(img=masked, x=0, y=0, w=image.shape[0], h=image.shape[1])
-    kept_mask = pcv.roi.filter(mask=filled, roi=roi, roi_type='partial')
-
-    # Pseudolandmarks on masked image
-    pseudowithoutbg = create_pseudolandmarks_image(masked, kept_mask)
-
-    # Doublewithoutbg: concatenation horizontale de Mask + Pseudowithoutbg
-    doublewithoutbg = np.concatenate((masked, pseudowithoutbg), axis=1)
-
-    # Resize to 256x256 for training compatibility
-    doublewithoutbg = cv2.resize(doublewithoutbg, (256, 256), interpolation=cv2.INTER_AREA)
-
-    # Save
-    if not os.path.exists(dst_folder):
-        os.makedirs(dst_folder)
-    
-    base_name = os.path.splitext(os.path.basename(image_path))[0]
-    save_img = cv2.cvtColor(doublewithoutbg, cv2.COLOR_RGB2BGR)
-    save_path = os.path.join(dst_folder, f"{base_name}_Doublewithoutbg.jpg")
-    cv2.imwrite(save_path, save_img)
-    print(f"Saved: {save_path}")
-
-
 def process_mask(image_path, dst_folder):
     """Process image and save only Mask (leaf on black background) for training."""
     image_bgr = ft_load(image_path)
@@ -285,8 +238,7 @@ def main():
         parser.add_argument("image_path", type=str, nargs='?', help="Path to the input image file.")
         parser.add_argument("-src", type=str, help="Source directory for images.")
         parser.add_argument("-dst", type=str, help="Destination directory for output.")
-        parser.add_argument("--double", action="store_true", help="Save only Doublewithoutbg images (for training).")
-        parser.add_argument("--mask", action="store_true", help="Save only Mask images (leaf on black background, recommended for training).")
+        parser.add_argument("--mask", action="store_true", help="Save only Mask images (leaf on black background).")
         args = parser.parse_args()
         
         # Batch Mode
@@ -299,14 +251,11 @@ def main():
                 
             valid_exts = ('.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG')
             
-            # Recursive walk or simple listdir based on needs. Using listdir for simplicity.
             for filename in os.listdir(args.src):
                 if filename.endswith(valid_exts):
                     file_path = os.path.join(args.src, filename)
                     try:
-                        if args.double:
-                            process_doublewithoutbg(file_path, dst_folder=args.dst)
-                        elif args.mask:
+                        if args.mask:
                             process_mask(file_path, dst_folder=args.dst)
                         else:
                             process_single_image(file_path, dst_folder=args.dst)
