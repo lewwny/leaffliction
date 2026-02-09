@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 import argparse
-import cv2 
+import cv2
 import rembg
 import os
 import matplotlib.pyplot as plt
@@ -30,6 +30,7 @@ def plot_stat_hist(label, sc=1):
     ):
         x = [x + 128 for x in x]
     plt.plot(x, y, label=label)
+
 
 def is_roi_border(x, y, roi_start_x, roi_start_y, roi_h, roi_w, roi_line_w):
     return (
